@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block body %}
+<h1 class="title">稳健离群</h1>
+{% if outliers %}
+<p class="statline">
+  <span>数值列 <b class="num">{{ outliers.counts.numeric_columns }}</b></span>
+  <span>参检格 <b class="num">{{ outliers.counts.tested_cells|intf }}</b></span>
+  <span>离群格 <b class="num">{{ outliers.counts.outlier_cells|intf }}</b></span>
+  <span>离群率 <b class="num">{{ outliers.counts.outlier_rate|pct }}</b></span>
+  <span>阈值 <b class="num">|z| &gt; 3.5</b></span>
+</p>
+
+<section class="block">
+  <h2 class="block__title">按列</h2>
+  <table class="ledger ledger--wide" data-sortable>
+    <thead>
+      <tr><th>列</th><th>方法</th><th class="num">中位数</th><th class="num">MAD</th>
+          <th class="num">IQR</th><th class="num">离散度</th><th class="num">参检</th>
+          <th class="num">离群</th><th>状态</th></tr>
+    </thead>
+    <tbody>
+      {% for column in outliers.columns %}
+      <tr>
+        <td>{{ column.label }}</td>
+        <td class="mono">{{ column.method }}</td>
+        <td class="num">{{ column.median }}</td>
+        <td class="num">{{ column.mad }}</td>
+        <td class="num">{{ column.iqr }}</td>
+        <td class="num">{{ column.spread }}</td>
+        <td class="num">{{ column.tested|intf }}</td>
+        <td class="num">{{ column.outliers|intf }}</td>
+        <td>{% if column.degenerate %}<span class="tag">退化</span>{% else %}<span class="sev sev--pass">参检</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="block">
+  <h2 class="block__title">退化列</h2>
+  {% if outliers.degenerate %}
+  <table class="ledger">
+    <thead><tr><th>列</th><th>原因码</th><th>说明</th></tr></thead>
+    <tbody>
+      {% for item in outliers.degenerate %}
+      <tr><td>{{ item.label }}</td><td class="mono">{{ item.code }}</td><td>{{ item.detail }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">没有退化列。</p>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2 class="block__title">离群格</h2>
+  {% if outliers.cells %}
+  <table class="ledger">
+    <thead><tr><th>列</th><th class="num">行号</th><th class="num">原值</th><th class="num">归一值</th><th class="num">z</th><th>原因码</th></tr></thead>
+    <tbody>
+      {% for cell in outliers.cells %}
+      <tr>
+        <td>{{ cell.column }}</td>
+        <td class="num">{{ cell.lineno }}</td>
+        <td class="num mono">{{ cell.raw }}</td>
+        <td class="num">{{ cell.value }}</td>
+        <td class="num">{{ cell.z }}</td>
+        <td class="mono">{{ cell.code }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">没有离群格。</p>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2 class="block__title">导出</h2>
+  <p class="links"><a class="link" href="/api/export/outliers.csv">导出离群</a></p>
+</section>
+{% else %}
+<p class="empty">还没有运行记录。</p>
+{% endif %}
+{% endblock %}

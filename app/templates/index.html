@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block body %}
+{% if report %}
+<h1 class="title">报告</h1>
+<section class="verdict">
+  <div class="verdict__score">
+    <span class="verdict__value">{{ report.score }}</span>
+    <span class="verdict__unit">分</span>
+  </div>
+  <div class="verdict__side">
+    <span class="grade grade--{{ report.grade|lower }}">{{ report.grade }} · {{ report.grade_label }}</span>
+    <span class="verdict__dataset">{{ report.dataset.name }}</span>
+    <span class="verdict__digest">sha256 <code>{{ report.dataset.digest[:16] }}</code></span>
+  </div>
+</section>
+
+<section class="block">
+  <h2 class="block__title">扣分<span class="block__hint num">{{ report.penalty_sum }} / 100</span></h2>
+  <div class="bars" data-bars>
+    {% for bar in report.bars %}
+    <div class="bar" data-value="{{ bar.width }}">
+      <span class="bar__label">{{ bar.label }}</span>
+      <span class="bar__track"><span class="bar__fill sev--{{ bar.severity }}" style="width: {{ bar.width }}%"></span></span>
+      <span class="bar__num num">{{ bar.penalty }}<span class="bar__cap">/{{ bar.cap }}</span></span>
+      <span class="sev sev--{{ bar.severity }}">{{ bar.severity_label }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <table class="ledger">
+    <thead>
+      <tr><th>维度</th><th class="num">比率</th><th class="num">容忍度</th><th class="num">扣分</th><th>状态</th></tr>
+    </thead>
+    <tbody>
+      {% for dim in report.dims %}
+      <tr>
+        <td>{{ dim.label }}</td>
+        <td class="num">{{ dim.rate|pct }}</td>
+        <td class="num">{{ dim.tolerance|pct }}</td>
+        <td class="num">{{ dim.penalty }}</td>
+        <td><span class="sev sev--{{ dim.severity }}">{{ dim.severity_label }}</span>{% if dim.capped %} <span class="tag">封顶</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="block">
+  <h2 class="block__title">列缺失</h2>
+  <figure class="chart" data-chart data-max="100">
+    <div class="chart__plot">
+      {% for column in report.columns %}
+      <div class="chart__col">
+        {% if column.missing_rate|float > 0 %}
+        <span class="chart__bar" style="height: {{ (column.missing_rate|float * 100)|round(1) }}%"></span>
+        {% else %}
+        <span class="chart__bar chart__bar--zero"></span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="chart__labels">
+      {% for column in report.columns %}
+      <div class="chart__label">
+        <span class="chart__name">{{ column.label }}</span>
+        <span class="chart__num num">{{ column.missing_rate|pct }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <figcaption class="aside">缺失率 0–100% · 全空列 {% if report.empty_columns %}{{ report.empty_columns|join(" / ") }}{% else %}<span class="dash">—</span>{% endif %}</figcaption>
+  </figure>
+</section>
+
+<section class="block">
+  <h2 class="block__title">对账<span class="block__hint">{% if report.balanced %}五项平衡{% else %}差异 {{ report.accounts|selectattr("balanced", "equalto", false)|list|length }} 项{% endif %}</span></h2>
+  <table class="ledger">
+    <thead>
+      <tr><th>账</th><th class="num">左侧</th><th class="num">右侧</th><th class="num">差额</th><th>结论</th></tr>
+    </thead>
+    <tbody>
+      {% for account in report.accounts %}
+      <tr>
+        <td>{{ account.label }}</td>
+        <td class="num">{{ account.left }}</td>
+        <td class="num">{{ account.right }}</td>
+        <td class="num">{{ account.diff }}</td>
+        <td>{% if account.balanced %}<span class="sev sev--pass">平衡</span>{% else %}<span class="sev sev--severe">不平</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="block">
+  <h2 class="block__title">计数</h2>
+  <ul class="pairs pairs--two">
+    <li class="pair"><span class="pair__key">原始记录</span><span class="pair__value num">{{ report.counters.raw_records|intf }}</span></li>
+    <li class="pair"><span class="pair__key">采纳行</span><span class="pair__value num">{{ report.counters.accepted|intf }}</span></li>
+    <li class="pair"><span class="pair__key">唯一行</span><span class="pair__value num">{{ report.counters.rows_unique|intf }}</span></li>
+    <li class="pair"><span class="pair__key">重复行</span><span class="pair__value num">{{ report.counters.rows_dup|intf }}</span></li>
+    <li class="pair"><span class="pair__key">隔离行</span><span class="pair__value num">{{ report.counters.quarantine|intf }}</span></li>
+    <li class="pair"><span class="pair__key">空行</span><span class="pair__value num">{{ report.counters.blank|intf }}</span></li>
+    <li class="pair"><span class="pair__key">单元格</span><span class="pair__value num">{{ report.counters.cells_total|intf }}</span></li>
+    <li class="pair"><span class="pair__key">有值格</span><span class="pair__value num">{{ report.counters.cells_value|intf }}</span></li>
+    <li class="pair"><span class="pair__key">缺失格</span><span class="pair__value num">{{ report.counters.cells_missing|intf }}</span></li>
+    <li class="pair"><span class="pair__key">格式不合格格</span><span class="pair__value num">{{ report.counters.cells_format_bad|intf }}</span></li>
+    <li class="pair"><span class="pair__key">离群格</span><span class="pair__value num">{{ report.counters.outlier_cells|intf }}</span></li>
+    <li class="pair"><span class="pair__key">参检格</span><span class="pair__value num">{{ report.counters.tested_cells|intf }}</span></li>
+  </ul>
+</section>
+
+<section class="block">
+  <h2 class="block__title">阶段</h2>
+  <ol class="stages">
+    {% for stage in report.stages %}
+    <li class="stage{% if stage.status != "done" %} stage--off{% endif %}">
+      <span class="stage__label">{{ stage.label }}</span>
+      <span class="stage__num num">{{ stage.in_count|intf }} → {{ stage.out_count|intf }}</span>
+      <span class="stage__q num">隔离 {{ stage.quarantine_count|intf }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% else %}
+<p class="empty">还没有运行记录。</p>
+{% endif %}
+
+<section class="block block--form">
+  <h2 class="block__title">采信</h2>
+  <form id="ingest-form" class="form"
+        data-run="{{ run.run_id if run else "" }}"
+        data-sample="{{ report.dataset.name if report else "" }}"
+        data-version="{{ run.version if run else "" }}">
+    <label class="field">
+      <span class="field__label">样例</span>
+      <select class="field__input" name="sample" id="sample-select">
+        {% for sample in samples %}
+        <option value="{{ sample.name }}"{% if run and sample.name == report.dataset.name %} selected{% endif %}>{{ sample.label }} · {{ sample.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field field--narrow">
+      <span class="field__label">编码</span>
+      <input class="field__input" type="text" name="encoding" id="encoding-input" placeholder="utf-8" autocomplete="off">
+    </label>
+    <div class="actions">
+      <button class="btn btn--primary" type="submit" id="run-btn">采信并评分</button>
+      {% if run %}<button class="btn" type="button" id="replay-btn">重跑</button>{% endif %}
+    </div>
+  </form>
+  <p class="status" id="form-status" role="status" aria-live="polite"></p>
+</section>
+
+<section class="block">
+  <h2 class="block__title">导出</h2>
+  <p class="links">
+    <a class="link" href="/api/export/report.csv">报告 CSV</a>
+    <a class="link" href="/api/export/profile.csv">画像 CSV</a>
+    <a class="link" href="/api/export/quarantine.csv">隔离区 CSV</a>
+    <a class="link" href="/api/export/manifest.json">运行清单 JSON</a>
+  </p>
+</section>
+{% endblock %}

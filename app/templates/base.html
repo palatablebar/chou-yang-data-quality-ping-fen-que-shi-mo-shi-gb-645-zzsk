@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title }} · qualiscore</title>
+  <link rel="stylesheet" href="/static/theme.css">
+  <link rel="stylesheet" href="/static/layout.css">
+  <link rel="stylesheet" href="/static/components.css">
+</head>
+<body class="page-{{ page }}">
+  <a class="skip" href="#main">跳到正文</a>
+  <header class="masthead">
+    <div class="masthead__inner">
+      <div class="brand">
+        <span class="brand__mark" aria-hidden="true">qs</span>
+        <span class="brand__name">qualiscore</span>
+        <span class="brand__rule">抽样质量评分</span>
+      </div>
+      <nav class="tabs" aria-label="章节">
+        {% for href, label, key in nav %}
+        <a class="tab{% if page == key %} tab--on{% endif %}" href="{{ href }}">{{ label }}</a>
+        {% endfor %}
+      </nav>
+    </div>
+    <div class="stamp">
+      <span class="stamp__item">批次号 <b>{{ run.run_id if run else "—" }}</b></span>
+      <span class="stamp__item">数据版本 <b>v{{ run.version if run else "—" }}</b></span>
+      <span class="stamp__item">规则 <b>{{ rule_version }}</b></span>
+      <span class="stamp__item">生成 <b>{{ generated_at }}</b></span>
+      <span class="stamp__item">时区 <b>{{ timezone_label }}</b></span>
+    </div>
+  </header>
+
+  <main id="main" class="sheet">
+    {% block body %}{% endblock %}
+  </main>
+
+  <footer class="foot">
+    <span class="foot__mark">qualiscore</span>
+    <a class="foot__link" href="/docs">接口</a>
+    <a class="foot__link" href="/api/export/manifest.json">运行清单</a>
+  </footer>
+
+  <script src="/static/table.js" defer></script>
+  <script src="/static/charts.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block body %}
+<h1 class="title">字段画像</h1>
+{% if profile %}
+<p class="statline">
+  <span>单元格 <b class="num">{{ profile.counts.cells_total|intf }}</b></span>
+  <span>有值 <b class="num">{{ profile.counts.cells_value|intf }}</b></span>
+  <span>合格 <b class="num">{{ profile.counts.cells_ok|intf }}</b></span>
+  <span>缺失 <b class="num">{{ profile.counts.cells_missing|intf }}</b></span>
+  <span>格式不合格 <b class="num">{{ profile.counts.cells_format_bad|intf }}</b></span>
+  <span>列 <b class="num">{{ profile.counts.columns }}</b></span>
+</p>
+
+<section class="block">
+  <h2 class="block__title">列</h2>
+  <table class="ledger ledger--wide" data-sortable>
+    <thead>
+      <tr>
+        <th>列</th><th>类型</th><th class="num">单元格</th><th class="num">有值</th>
+        <th class="num">缺失</th><th class="num">缺失率</th><th class="num">格式不合格</th>
+        <th class="num">基数</th><th class="num">最小</th><th class="num">最大</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for column in profile.profile %}
+      <tr>
+        <td>{{ column.label }}<span class="sub">{{ column.name }}</span></td>
+        <td class="mono">{{ column.kind }}</td>
+        <td class="num">{{ column.total|intf }}</td>
+        <td class="num">{{ column.filled|intf }}</td>
+        <td class="num">{{ column.missing|intf }}</td>
+        <td class="num">{{ column.missing_rate|pct }}</td>
+        <td class="num">{{ column.format_bad|intf }}</td>
+        <td class="num">{{ column.distinct|intf }}</td>
+        <td class="num">{{ column.min or "—" }}</td>
+        <td class="num">{{ column.max or "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="block">
+  <h2 class="block__title">高频取值</h2>
+  <ul class="pairs">
+    {% for column in profile.profile if column.top %}
+    <li class="pair">
+      <span class="pair__key">{{ column.label }}</span>
+      <span class="pair__value num">{% for item in column.top %}{{ item.value }} × {{ item.count }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="block">
+  <h2 class="block__title">导出</h2>
+  <p class="links">
+    <a class="link" href="/api/export/profile.csv">导出画像</a>
+    <a class="link" href="/api/export/flags.csv">导出标记</a>
+  </p>
+</section>
+{% else %}
+<p class="empty">还没有运行记录。</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,37 @@
+/* qualiscore 主题变量：纸面 + 酒红，L4 质量报告的疏排与细线。 */
+:root {
+  /* 纸面与墨色 */
+  --bg: #faf7f5;
+  --paper: var(--bg);
+  --paper-2: #f3ece9;
+  --card: #fffdfc;
+  --ink: #241a1c;
+  --ink-soft: #574449;
+  --ink-muted: #8b767b;
+  --rule: #e4d7d3;
+  --rule-strong: #c8b0ab;
+  /* 酒红主色 */
+  --accent: #8e2f3c;
+  --accent-ink: #fff8f7;
+  --accent-soft: #f1dde0;
+  /* 状态色：通过 / 警告 / 失败 / 未知 */
+  --ok: #2f6b52;
+  --warn: #a8730f;
+  --bad: #a32b2b;
+  --info: #4a5a73;
+  /* 字族：正文衬线、界面无衬线、数字与代码等宽 */
+  --font-doc: "Songti SC", "Noto Serif SC", "Source Han Serif SC", Georgia, "Times New Roman", serif;
+  --font-ui: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-num: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-mono: "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+  /* 尺度与密度：疏排、细线、几乎无圆角 */
+  --radius: 2px;
+  --radius-sm: 1px;
+  --pad: 32px;
+  --gap: 28px;
+  --measure: 960px;
+  --line: 1px;
+  --track: 8px;
+  --dur: 140ms;
+  --shadow: none;
+}

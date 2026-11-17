@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block body %}
+<h1 class="title">重复判定</h1>
+{% if duplicates %}
+<p class="statline">
+  <span>采纳行 <b class="num">{{ duplicates.rows|intf }}</b></span>
+  <span>唯一行 <b class="num">{{ duplicates.unique_rows|intf }}</b></span>
+  <span>重复行 <b class="num">{{ duplicates.duplicate_rows|intf }}</b></span>
+  <span>全行组 <b class="num">{{ duplicates.hash_groups|length }}</b></span>
+  <span>冲突组 <b class="num">{{ duplicates.conflicts|length }}</b></span>
+</p>
+
+<section class="block">
+  <h2 class="block__title">全行哈希</h2>
+  {% if duplicates.hash_groups %}
+  <table class="ledger">
+    <thead><tr><th>组</th><th class="num">行数</th><th class="num">代表行</th><th>重复行</th></tr></thead>
+    <tbody>
+      {% for item in duplicates.hash_groups %}
+      <tr>
+        <td class="mono">{{ item.hash }}</td>
+        <td class="num">{{ item.count }}</td>
+        <td class="num">{{ item.representative }}</td>
+        <td class="mono">{{ item.duplicate_linenos|join(" ") }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">没有全行重复。</p>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2 class="block__title">业务键冲突</h2>
+  {% if duplicates.conflicts %}
+  <table class="ledger">
+    <thead><tr><th>键</th><th class="num">行数</th><th>行号</th><th>冲突列</th></tr></thead>
+    <tbody>
+      {% for item in duplicates.conflicts %}
+      <tr>
+        <td class="mono">{{ item.key }}</td>
+        <td class="num">{{ item.count }}</td>
+        <td class="mono">{{ item.linenos|join(" ") }}</td>
+        <td>{% for field in item.fields %}{{ field }}{% if not loop.last %} · {% endif %}{% endfor %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">没有同键冲突。</p>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2 class="block__title">原值对照</h2>
+  {% for item in duplicates.conflicts %}
+  <table class="ledger ledger--tight">
+    <thead><tr><th>键 {{ item.key }}</th><th class="num">行号</th><th>原值</th></tr></thead>
+    <tbody>
+      {% for field in item.rows %}
+        {% for value in field.entries %}
+        <tr><td>{{ field.column }}</td><td class="num">{{ value.lineno }}</td><td class="mono">{{ value.raw }}</td></tr>
+        {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endfor %}
+</section>
+
+<section class="block">
+  <h2 class="block__title">导出</h2>
+  <p class="links"><a class="link" href="/api/export/duplicates.csv">导出重复</a></p>
+</section>
+{% else %}
+<p class="empty">还没有运行记录。</p>
+{% endif %}
+{% endblock %}

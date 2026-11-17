@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block body %}
+<h1 class="title">缺失模式</h1>
+{% if missing %}
+<p class="statline">
+  <span>单元格 <b class="num">{{ missing.account.cells_total|intf }}</b></span>
+  <span>缺失 <b class="num">{{ missing.account.missing|intf }}</b></span>
+  <span>有值 <b class="num">{{ missing.account.filled|intf }}</b></span>
+  <span>连续段 <b class="num">{{ missing.runs|length }}</b></span>
+  <span>结论 {% if missing.account.closed %}<b class="ok">闭口</b>{% else %}<b class="bad">不闭口</b>{% endif %}</span>
+</p>
+
+<section class="block">
+  <h2 class="block__title">按列</h2>
+  <table class="ledger">
+    <thead>
+      <tr><th>列</th><th class="num">缺失</th><th class="num">有值</th><th class="num">缺失率</th><th class="num">连续段</th><th class="num">最长段</th></tr>
+    </thead>
+    <tbody>
+      {% for column in summary.columns %}
+      <tr>
+        <td>{{ column.label }}</td>
+        <td class="num">{{ column.missing|intf }}</td>
+        <td class="num">{{ column.filled|intf }}</td>
+        <td class="num">{{ column.missing_rate|pct }}</td>
+        <td class="num">{{ (summary.runs|selectattr("column", "equalto", column.name)|list|first).runs if summary.runs|selectattr("column", "equalto", column.name)|list else 0 }}</td>
+        <td class="num">{{ (summary.runs|selectattr("column", "equalto", column.name)|list|first).longest if summary.runs|selectattr("column", "equalto", column.name)|list else 0 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="block">
+  <h2 class="block__title">连续段</h2>
+  {% if missing.runs %}
+  <table class="ledger">
+    <thead><tr><th>列</th><th class="num">起始行</th><th class="num">结束行</th><th class="num">长度</th><th>原因码</th></tr></thead>
+    <tbody>
+      {% for run in missing.runs %}
+      <tr>
+        <td>{{ run.label }}</td>
+        <td class="num">{{ run.start_lineno }}</td>
+        <td class="num">{{ run.end_lineno }}</td>
+        <td class="num">{{ run.length }}</td>
+        <td class="mono">{{ run.code }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">没有连续缺失段。</p>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2 class="block__title">缺失模式</h2>
+  <table class="ledger">
+    <thead><tr><th>缺失列</th><th class="num">行数</th><th>行号</th></tr></thead>
+    <tbody>
+      {% for pattern in missing.patterns %}
+      <tr>
+        <td>{{ pattern.labels|join(" / ") }}</td>
+        <td class="num">{{ pattern.count }}</td>
+        <td class="mono">{{ pattern.linenos|join(" ") }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="block">
+  <h2 class="block__title">共缺对</h2>
+  {% if missing.co_missing %}
+  <table class="ledger">
+    <thead><tr><th>列对</th><th class="num">同时缺失行数</th></tr></thead>
+    <tbody>
+      {% for pair in missing.co_missing %}
+      <tr><td>{{ pair.left_label }} / {{ pair.right_label }}</td><td class="num">{{ pair.count }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">没有共缺的列对。</p>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2 class="block__title">导出</h2>
+  <p class="links">
+    <a class="link" href="/api/export/missing.csv">导出缺失</a>
+    <a class="link" href="/api/export/quarantine.csv">隔离区 CSV</a>
+  </p>
+</section>
+{% else %}
+<p class="empty">还没有运行记录。</p>
+{% endif %}
+{% endblock %}

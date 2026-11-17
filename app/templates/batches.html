@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block body %}
+<h1 class="title">评分批次</h1>
+
+<section class="block">
+  <h2 class="block__title">运行</h2>
+  {% if runs %}
+  <table class="ledger ledger--wide" data-sortable>
+    <thead>
+      <tr><th>批次号</th><th class="num">版本</th><th>样例</th><th class="num">采纳</th>
+          <th class="num">重复</th><th class="num">缺失格</th><th class="num">得分</th>
+          <th>等级</th><th>时间</th></tr>
+    </thead>
+    <tbody>
+      {% for item in runs %}
+      <tr>
+        <td class="mono">{{ item.run_id }}</td>
+        <td class="num">v{{ item.version }}</td>
+        <td>{{ item.name }}</td>
+        <td class="num">{{ item.rows_accepted|intf }}</td>
+        <td class="num">{{ item.rows_dup|intf }}</td>
+        <td class="num">{{ item.cells_missing|intf }}</td>
+        <td class="num">{{ item.score }}</td>
+        <td><span class="grade grade--{{ item.grade|lower }}">{{ item.grade }}</span></td>
+        <td class="mono">{{ item.created_at|localdt }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">还没有运行记录。</p>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2 class="block__title">阈值</h2>
+  <table class="ledger">
+    <thead><tr><th>维度</th><th class="num">封顶</th><th class="num">容忍度</th></tr></thead>
+    <tbody>
+      {% for weight in weights %}
+      <tr><td>{{ weight.label }}</td><td class="num">{{ weight.cap }}</td><td class="num">{{ weight.tolerance|pct }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% if reconcile %}
+<section class="block">
+  <h2 class="block__title">对账<span class="block__hint">{{ run.run_id }}</span></h2>
+  <table class="ledger">
+    <thead><tr><th>账</th><th class="num">左侧</th><th class="num">右侧</th><th class="num">差额</th><th>结论</th></tr></thead>
+    <tbody>
+      {% for account in reconcile.accounts %}
+      <tr>
+        <td>{{ account.label }}</td>
+        <td class="num">{{ account.left }}</td>
+        <td class="num">{{ account.right }}</td>
+        <td class="num">{{ account.diff }}</td>
+        <td>{% if account.balanced %}<span class="sev sev--pass">平衡</span>{% else %}<span class="sev sev--severe">不平</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<section class="block">
+  <h2 class="block__title">导出</h2>
+  <p class="links">
+    <a class="link" href="/api/export/report.csv">导出报告</a>
+    <a class="link" href="/api/export/missing.csv">导出缺失</a>
+    <a class="link" href="/api/export/duplicates.csv">导出重复</a>
+    <a class="link" href="/api/export/outliers.csv">导出离群</a>
+    <a class="link" href="/api/export/quarantine.csv">隔离区 CSV</a>
+    <a class="link" href="/api/export/manifest.json">运行清单 JSON</a>
+  </p>
+</section>
+{% endblock %}
