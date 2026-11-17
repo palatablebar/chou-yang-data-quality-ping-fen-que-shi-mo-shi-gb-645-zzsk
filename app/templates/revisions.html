@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block body %}
+<h1 class="title">修订补发</h1>
+
+{% if revision %}
+<p class="statline">
+  <span>基线 <b class="mono">{{ revision.base_run_id }}</b> · v{{ revision.base_version }}</span>
+  <span>修订版 <b>v{{ revision.version }}</b></span>
+  <span>已更正 <b class="ok num">{{ revision.counts.corrected }}</b></span>
+  <span>待核对 <b class="bad num">{{ revision.counts.pending }}</b></span>
+  <span>保持原样 <b class="num">{{ revision.counts.kept_original }}</b></span>
+  <span>改写格 <b class="num">{{ revision.counts.changed_cells }}</b></span>
+</p>
+
+<section class="block">
+  <h2 class="block__title">修订账<span class="block__hint">{% if revision.pending_blocks %}存在阻断{% else %}未匹配不阻断发布{% endif %}</span></h2>
+  <table class="ledger">
+    <thead><tr><th>项</th><th class="num">数量</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>已更正</td><td class="num">{{ revision.counts.corrected }}</td><td>找到原始工单且至少一格真的改写</td></tr>
+      <tr><td>待核对</td><td class="num">{{ revision.counts.pending }}</td><td>找不到原始工单 / 重复 / 结构坏行，保留不丢</td></tr>
+      <tr><td>保持原样</td><td class="num">{{ revision.counts.kept_original }}</td><td>找到原始工单但取值一致</td></tr>
+      <tr><td>更正文行数</td><td class="num">{{ revision.counts.correction_rows }}</td><td>含结构坏行</td></tr>
+      <tr><td>改写单元格</td><td class="num">{{ revision.counts.changed_cells }}</td><td>逐格留原值</td></tr>
+    </tbody>
+  </table>
+  <p class="aside">{{ revision.policy }}</p>
+  {% if revision.counts.pending_by_code %}
+  <table class="ledger ledger--tight">
+    <thead><tr><th>待核对原因码</th><th class="num">数量</th><th>含义</th></tr></thead>
+    <tbody>
+      {% for code, count in revision.counts.pending_by_code.items() %}
+      <tr><td class="mono">{{ code }}</td><td class="num">{{ count }}</td><td>{{ labels.get(code, code) }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2 class="block__title">逐单状态</h2>
+  {% if revision.tickets %}
+  <table class="ledger ledger--wide" data-sortable>
+    <thead>
+      <tr><th>工单</th><th>状态</th><th>原因码</th><th class="num">基线行号</th>
+          <th class="num">更正文行号</th><th>改写列</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+      {% for ticket in revision.tickets %}
+      <tr>
+        <td class="mono">{{ ticket.ticket_id }}</td>
+        <td>
+          {% if ticket.status == "corrected" %}<span class="sev sev--pass">{{ revision.status_labels.corrected }}</span>
+          {% elif ticket.status == "pending" %}<span class="sev sev--severe">{{ revision.status_labels.pending }}</span>
+          {% else %}<span class="tag">{{ revision.status_labels.kept_original }}</span>{% endif %}
+        </td>
+        <td class="mono">{{ ticket.code }}{% for code in ticket.warnings %}<span class="sub">{{ code }}</span>{% endfor %}</td>
+        <td class="num">{{ ticket.base_linenos|join(" ") or "—" }}</td>
+        <td class="num">{{ ticket.correction_linenos|join(" ") or "—" }}</td>
+        <td class="mono">{{ ticket.changed_columns|join(" ") or "—" }}</td>
+        <td>{{ ticket.reason }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">这一版没有逐单修订项。</p>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2 class="block__title">逐格留痕</h2>
+  {% if revision.changes %}
+  <table class="ledger ledger--wide">
+    <thead><tr><th>工单</th><th>列</th><th>原值</th><th>更正后</th><th class="num">基线行号</th></tr></thead>
+    <tbody>
+      {% for change in revision.changes %}
+      <tr>
+        <td class="mono">{{ change.ticket_id }}</td>
+        <td>{{ change.label }}<span class="sub">{{ change.column }}</span></td>
+        <td class="mono">{{ change.before if change.before != "" else "（空）" }}</td>
+        <td class="mono">{{ change.after }}</td>
+        <td class="num">{{ change.base_linenos|join(" ") }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">没有改写任何单元格。</p>
+  {% endif %}
+</section>
+
+{% if revision.carried_pending %}
+<section class="block">
+  <h2 class="block__title">结转到下一版的待核对</h2>
+  <table class="ledger">
+    <thead><tr><th>工单</th><th>建议值</th></tr></thead>
+    <tbody>
+      {% for item in revision.carried_pending %}
+      <tr>
+        <td class="mono">{{ item.ticket_id }}</td>
+        <td class="mono">{% for column, value in item.proposed.items() %}{{ column }}={{ value }}{% if not loop.last %} · {% endif %}{% endfor %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<section class="block">
+  <h2 class="block__title">导出</h2>
+  <p class="links">
+    <a class="link" href="/api/export/revision.csv">修订账 CSV</a>
+    <a class="link" href="/api/export/report.csv">报告 CSV</a>
+    <a class="link" href="/api/export/manifest.json">运行清单 JSON</a>
+  </p>
+</section>
+{% else %}
+<p class="empty">当前运行不是修订版。请先在报告页选数据集并上传更正文。</p>
+{% endif %}
+
+<section class="block block--form">
+  <h2 class="block__title">补发修订</h2>
+  <form id="revision-form" class="form"
+        data-base="" data-version="">
+    <label class="field">
+      <span class="field__label">数据集</span>
+      <select class="field__input" name="dataset" id="revision-dataset">
+        {% for item in datasets %}
+        <option value="{{ item.name }}"{% if run and item.name == run.name %} selected{% endif %}>{{ item.name }} · v{{ item.version }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">
+      <span class="field__label">更正文 CSV</span>
+      <input class="field__input" type="file" name="file" id="correction-file" accept=".csv,text/csv">
+    </label>
+    <label class="field field--narrow">
+      <span class="field__label">编码</span>
+      <input class="field__input" type="text" name="encoding" id="correction-encoding" placeholder="utf-8" autocomplete="off">
+    </label>
+    <div class="actions">
+      <button class="btn btn--primary" type="submit" id="revision-btn">发布修订版</button>
+    </div>
+  </form>
+  <p class="status" id="revision-status" role="status" aria-live="polite"></p>
+</section>
+
+{% if runs %}
+<section class="block">
+  <h2 class="block__title">最近运行</h2>
+  <table class="ledger">
+    <thead><tr><th>批次号</th><th class="num">版本</th><th>类型</th><th class="num">得分</th><th>时间</th></tr></thead>
+    <tbody>
+      {% for item in runs %}
+      <tr>
+        <td class="mono">{{ item.run_id }}</td>
+        <td class="num">v{{ item.version }}</td>
+        <td>{% if item.kind == "revision" %}修订{% else %}基础{% endif %}</td>
+        <td class="num">{{ item.score }}</td>
+        <td class="mono">{{ item.created_at|localdt }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

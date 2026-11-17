@@ -7,7 +7,7 @@
   {% if runs %}
   <table class="ledger ledger--wide" data-sortable>
     <thead>
-      <tr><th>批次号</th><th class="num">版本</th><th>样例</th><th class="num">采纳</th>
+      <tr><th>批次号</th><th class="num">版本</th><th>类型</th><th>样例</th><th class="num">采纳</th>
           <th class="num">重复</th><th class="num">缺失格</th><th class="num">得分</th>
           <th>等级</th><th>时间</th></tr>
     </thead>
@@ -16,6 +16,7 @@
       <tr>
         <td class="mono">{{ item.run_id }}</td>
         <td class="num">v{{ item.version }}</td>
+        <td>{% if item.kind == "revision" %}修订{% else %}基础{% endif %}</td>
         <td>{{ item.name }}</td>
         <td class="num">{{ item.rows_accepted|intf }}</td>
         <td class="num">{{ item.rows_dup|intf }}</td>
@@ -64,6 +65,35 @@
 </section>
 {% endif %}
 
+<section class="block block--form">
+  <h2 class="block__title">补发修订</h2>
+  <p class="aside">上传客服补回的更正文（只含部分工单）。未匹配的行不阻断发布，会保留为待核对；同一更正重试不重复计分。</p>
+  <form id="revision-form" class="form"
+        data-base="{{ run.run_id if run else "" }}"
+        data-version="{{ run.version if run else "" }}">
+    <label class="field">
+      <span class="field__label">数据集</span>
+      <select class="field__input" name="dataset" id="revision-dataset">
+        {% for item in datasets %}
+        <option value="{{ item.name }}"{% if run and item.name == run.name %} selected{% endif %}>{{ item.name }} · v{{ item.version }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">
+      <span class="field__label">更正文 CSV</span>
+      <input class="field__input" type="file" name="file" id="correction-file" accept=".csv,text/csv">
+    </label>
+    <label class="field field--narrow">
+      <span class="field__label">编码</span>
+      <input class="field__input" type="text" name="encoding" id="correction-encoding" placeholder="utf-8" autocomplete="off">
+    </label>
+    <div class="actions">
+      <button class="btn btn--primary" type="submit" id="revision-btn">发布修订版</button>
+    </div>
+  </form>
+  <p class="status" id="revision-status" role="status" aria-live="polite"></p>
+</section>
+
 <section class="block">
   <h2 class="block__title">导出</h2>
   <p class="links">
@@ -71,6 +101,7 @@
     <a class="link" href="/api/export/missing.csv">导出缺失</a>
     <a class="link" href="/api/export/duplicates.csv">导出重复</a>
     <a class="link" href="/api/export/outliers.csv">导出离群</a>
+    <a class="link" href="/api/export/revision.csv">修订账 CSV</a>
     <a class="link" href="/api/export/quarantine.csv">隔离区 CSV</a>
     <a class="link" href="/api/export/manifest.json">运行清单 JSON</a>
   </p>

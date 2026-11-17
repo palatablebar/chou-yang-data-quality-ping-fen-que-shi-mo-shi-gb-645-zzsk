@@ -61,6 +61,57 @@
     }
   }
 
+  async function postRevision(form) {
+    if (state.busy) return;
+    const fileInput = byId("correction-file");
+    const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+    if (!file) {
+      revisionStatus("请先选择更正文 CSV。", "bad");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("dataset", String((byId("revision-dataset") || form.elements.dataset || {}).value || ""));
+    formData.append("encoding", String((byId("correction-encoding") || {}).value || ""));
+    if (form.getAttribute("data-base")) {
+      formData.append("base_run_id", form.getAttribute("data-base"));
+    }
+    if (form.getAttribute("data-version")) {
+      formData.append("expected_version", form.getAttribute("data-version"));
+    }
+    state.busy = true;
+    buttons(true);
+    const button = byId("revision-btn");
+    if (button) button.disabled = true;
+    revisionStatus("正在匹配并发布…");
+    try {
+      const response = await fetch("/api/revisions/upload", {
+        method: "POST",
+        body: formData
+      });
+      const payload = await response.json().catch(function () { return {}; });
+      if (!response.ok) {
+        const message = payload.message || payload.detail || response.statusText;
+        throw new Error(message + "（HTTP " + response.status + "）");
+      }
+      revisionStatus("完成，正在刷新…", "good");
+      window.location.assign("/revisions?run_id=" + encodeURIComponent(payload.run.run_id));
+    } catch (error) {
+      revisionStatus(error.message, "bad");
+      buttons(false);
+      if (button) button.disabled = false;
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  function revisionStatus(text, kind) {
+    const node = byId("revision-status");
+    if (!node) return;
+    node.textContent = text;
+    node.className = "status" + (kind ? " status--" + kind : "");
+  }
+
   function bind() {
     const form = byId("ingest-form");
     if (form) {
@@ -82,6 +133,13 @@
           encoding: String((byId("encoding-input") || {}).value || ""),
           expected_version: form.getAttribute("data-version") || null
         });
+      });
+    }
+    const revisionForm = byId("revision-form");
+    if (revisionForm) {
+      revisionForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        postRevision(revisionForm);
       });
     }
   }

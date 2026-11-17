@@ -1,6 +1,6 @@
 # 深度登记 qualiscore（抽样数据质量评分与缺失模式）
 
-- 规模：中型（7 个功能模块 / 6 个应用页 / 97 条测试）
+- 规模：中型（8 个功能模块 / 7 个应用页 / 123 条测试）
 - 核心规则：**MAD 稳健 z + 退化回退 + 封顶加权评分**。逐格先判三态（缺失 / 格式不合格 / 有值），
   再按列算中位数与 MAD；`z = 0.6745 × (x − 中位数) / MAD`，MAD=0 时回退 `spread = 0.6745 × IQR / 1.349`，
   离散度低于「列刻度 × 5」或 MAD 与 IQR 同为 0 判退化；评分 = 100 − 缺失 30 − 重复 25 − 离群 20 − 格式 25，
@@ -18,10 +18,11 @@
 | M4 重复判定 | 看全行重复组与同键冲突的原值对照 | GET /api/duplicates、页面 /duplicates | `app/modules/m4_duplicates/hashdup.py` `app/modules/m4_duplicates/keydup.py` `app/modules/m4_duplicates/groups.py` `app/modules/m4_duplicates/service.py` | `tests/test_m4_duplicates.py` |
 | M5 稳健离群 | 看逐列中位数、MAD、回退方法与离群格 | GET /api/outliers、页面 /outliers | `app/modules/m5_outliers/robust.py` `app/modules/m5_outliers/zscore.py` `app/modules/m5_outliers/flags.py` `app/modules/m5_outliers/service.py` | `tests/test_m5_outliers.py` |
 | M6 评分与批次 | 跑一次评分、查运行历史、看五项对账、重跑 | POST /api/score、GET /api/batches、GET /api/reconcile、页面 /batches | `app/modules/m6_score/score.py` `app/modules/m6_score/grade.py` `app/modules/m6_score/runstore.py` `app/modules/m6_score/service.py` | `tests/test_m6_score.py` |
-| M7 报告导出 | 看报告页、导出六种 CSV 与运行清单 | GET /、GET /api/export/* | `app/modules/m7_export/report.py` `app/modules/m7_export/csv_out.py` `app/modules/m7_export/manifest_out.py` `app/modules/m7_export/service.py` | `tests/test_m7_export.py` |
+| M7 报告导出 | 看报告页、导出六种 CSV、修订账与运行清单 | GET /、GET /api/export/* | `app/modules/m7_export/report.py` `app/modules/m7_export/csv_out.py` `app/modules/m7_export/manifest_out.py` `app/modules/m7_export/service.py` | `tests/test_m7_export.py` |
+| M8 修订补发 | 上传只含部分工单的更正文，逐单看已更正 / 待核对 / 保持原样 | POST /api/revisions、POST /api/revisions/upload、GET /api/revision、页面 /revisions | `app/modules/m8_revision/correction.py` `app/modules/m8_revision/matcher.py` `app/modules/m8_revision/service.py` | `tests/test_m8_revision.py` |
 
-端到端：`tests/test_e2e.py`（HTTP 走完采信 → 评分 → 六页 200 → 八种导出；含上传、失败输入、陈旧版本 409）。
-不变量：`tests/test_invariants.py`（行分区、单元格分区、分数闭合、幂等重跑、重复分区、顺序无关、缺失扣分单调）。
+端到端：`tests/test_e2e.py`（HTTP 走完采信 → 评分 → 七页 200 → 八种导出；含上传、失败输入、陈旧版本 409、修订发布与待核对导出）。
+不变量：`tests/test_invariants.py`（行分区、单元格分区、分数闭合、幂等重跑、重复分区、顺序无关、缺失扣分单调、修订重试不重复扣分/不加版本、修订分数闭合）。
 
 ## 陷阱登记
 
@@ -38,6 +39,10 @@
 | TRAP-19 | 一个单元格同时像缺失、越界、离群 | 按代码顺序覆盖，分项之和大于总分 | 固定优先级缺失 > 格式不合格 > 离群，一格只进一个桶 | `app/modules/m5_outliers/flags.py`、`app/modules/m2_profile/formats.py` | `tests/test_m5_outliers.py::test_priority_missing_over_range_over_outlier` |
 | TRAP-22 | 同一组重复行打乱顺序 | 代表行随顺序变化，导出结果不可复现 | 代表行取最小原始行号，组排序按代表行号 | `app/modules/m4_duplicates/groups.py`、`app/modules/m4_duplicates/hashdup.py` | `tests/test_m4_duplicates.py::test_order_independence_of_groups` |
 | TRAP-26 | 旧页面提交覆盖新结果 | 后提交无条件写入，新版本被旧数据顶掉 | 同名数据集版本自增，`expected_version` 落后即 409 | `app/modules/m6_score/runstore.py` | `tests/test_m6_score.py::test_stale_submission_rejected`、`tests/test_e2e.py::test_stale_version_conflict_over_http` |
+| TRAP-31 | 更正文只含部分工单、行号与报告对不上 | 按行号回写，改到别的工单；或重导整份文件把已通过记录重算 | 按业务键回锚；只在上一次采信快照上改写被点名工单，基线不可变 | `app/modules/m8_revision/matcher.py`、`app/modules/m8_revision/service.py` | `tests/test_m8_revision.py::test_revision_matches_by_business_key_not_lineno`、`tests/test_m8_revision.py::test_revision_does_not_touch_base_run_or_dataset` |
+| TRAP-32 | 更正文有找不到的工单、重复工单、坏行 | 直接丢掉未匹配内容，或整批拒绝导致已匹配也发不出 | 未匹配不阻断：已匹配发布，其余逐单待核对并结转，可导出 | `app/modules/m8_revision/matcher.py` | `tests/test_m8_revision.py::test_revision_publishes_corrected_and_keeps_unmatched_pending`、`tests/test_m8_revision.py::test_pending_is_carried_forward_to_next_revision` |
+| TRAP-33 | 同一更正因重试提交两次 | 重复扣分、重复加版本 | 修订链按（基线摘要+更文摘要+规则）查重复用；版本号事务内现取 | `app/store.py`、`app/modules/m8_revision/service.py` | `tests/test_m8_revision.py::test_same_correction_retry_reuses_run_without_extra_version`、`tests/test_invariants.py::test_revision_retry_never_double_counts_or_double_versions` |
+| TRAP-34 | 修订落库中途失败 | 留下半个版本或覆盖旧版 | 运行行 + 采信快照 + 修订账单事务，失败整体回滚 | `app/store.py` | `tests/test_m8_revision.py::test_revision_storage_failure_keeps_old_version` |
 
 ## 对账规则
 
@@ -73,3 +78,5 @@
 - 只处理 UTF-8 / GB18030 两类编码；UTF-16、Big5、Shift-JIS 会落到 `E_DECODE`。
 - 稳健离群只支持数值列；日期列不做离群判定，文本列只做基数与格式检查。
 - 缺失模式只看「同列连续缺失」，不做跨文件的缺失趋势对比。
+- 修订只改业务键命中的工单；更正文里找不到的工单不会凭空新增行，只留待核对。
+- 修订不改变列契约；更正文出现契约外列按未知列忽略（与采信一致）。

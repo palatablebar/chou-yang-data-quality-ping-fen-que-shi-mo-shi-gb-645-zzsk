@@ -25,6 +25,7 @@ NAV = (
     ("/duplicates", "重复", "duplicates"),
     ("/outliers", "离群", "outliers"),
     ("/batches", "批次", "batches"),
+    ("/revisions", "修订", "revisions"),
 )
 
 @dataclass

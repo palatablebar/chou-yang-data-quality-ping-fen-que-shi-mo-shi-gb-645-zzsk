@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from app.modules.m6_score import service
+from app.modules.m6_score import service as score_service
+service = score_service
 from fixtures import dirty_cases, expected
 
 SAMPLES = ("tickets_dirty.csv", "tickets_clean.csv", "tickets_gbk.csv",
@@ -84,3 +85,40 @@ def test_missing_penalty_is_monotonic(settings):
     missing_dims = {item["key"]: item for item in missing["dims"]}
     assert Decimal(missing_dims["missing"]["penalty"]) > Decimal(clean_dims["missing"]["penalty"])
     assert Decimal(missing["score"]) < Decimal(clean["score"])
+
+
+def test_revision_retry_never_double_counts_or_double_versions(settings, store):
+    """同一更正重试：版本数、运行数、分数都不变；不同更正各加一版。"""
+    from app.modules.m8_revision import service as revision_service
+
+    score_service.run(settings, store, name="tickets_dirty.csv")
+    text = "ticket_id,satisfaction,agent\nT-2026-000107,4,王柯\n".encode()
+    first = revision_service.revise(settings, store, name="tickets_dirty.csv",
+                                    data=text)
+    second = revision_service.revise(settings, store, name="tickets_dirty.csv",
+                                     data=text)
+    assert first["run"]["version"] == 2
+    assert second["run"]["version"] == 2
+    assert second["run"]["score"] == first["run"]["score"]
+    assert store.count_runs() == 2
+
+    other = "ticket_id,satisfaction\nT-2026-000109,4\n".encode()
+    third = revision_service.revise(settings, store, name="tickets_dirty.csv",
+                                    data=other)
+    assert third["run"]["version"] == 3
+    assert store.count_runs() == 3
+
+
+def test_revision_score_closure_and_reconcile(settings, store):
+    from app.modules.m8_revision import service as revision_service
+
+    score_service.run(settings, store, name="tickets_dirty.csv")
+    result = revision_service.revise(
+        settings, store, name="tickets_dirty.csv",
+        data="ticket_id,satisfaction,agent\nT-2026-000107,4,王柯\n".encode())
+    total = Decimal(result["score"]["score"])
+    penalty = Decimal(result["score"]["penalty_sum"])
+    assert total + penalty == Decimal("100")
+    assert result["reconcile"]["all_balanced"] is True
+    for account in result["reconcile"]["accounts"]:
+        assert Decimal(str(account["diff"])) == 0, account["key"]

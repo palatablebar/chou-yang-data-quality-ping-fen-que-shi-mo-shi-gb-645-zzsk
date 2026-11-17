@@ -87,3 +87,68 @@ def test_pages_after_rerun_keep_numbers(client):
     second = client.get("/api/missing").json()
     assert first["account"]["cells_total"] == second["account"]["cells_total"]
     assert Decimal(replay.json()["score"]) == Decimal(expected.DIRTY["score"])
+
+
+def test_revision_over_http_publishes_partial_and_keeps_pending(client):
+    """HTTP 全流程：部分更正文 → 修订版；未匹配行保留待核对并可导出。"""
+    base = client.post("/api/score", json={"sample": "tickets_dirty.csv"}).json()
+    correction = ("ticket_id,satisfaction,agent\n"
+                  "T-2026-000107,4,王柯\n"
+                  "T-9999-999999,3,张三\n")
+    response = client.post("/api/revisions",
+                           json={"dataset": "tickets_dirty.csv",
+                                 "correction_text": correction})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["run"]["kind"] == "revision"
+    assert body["run"]["version"] == base["run"]["version"] + 1
+    assert body["revision"]["counts"]["corrected"] == 1
+    assert body["revision"]["counts"]["pending"] == 1
+    assert body["revision"]["policy"].startswith("未匹配内容不阻断")
+
+    page = client.get(f"/revisions?run_id={body['run']['run_id']}")
+    assert page.status_code == 200
+    for needle in ("已更正", "待核对", "保持原样", "T-9999-999999"):
+        assert needle in page.text
+
+    export = client.get(f"/api/export/revision.csv?run_id={body['run']['run_id']}")
+    assert export.status_code == 200
+    text = export.content.decode("utf-8")
+    assert "T-2026-000107,已更正,R_CORRECTED" in text
+    assert "T-9999-999999,待核对,R_CORRECTION_UNMATCHED" in text
+
+    page_report = client.get(f"/?run_id={body['run']['run_id']}")
+    assert page_report.status_code == 200
+    assert "修订版" in page_report.text
+
+
+def test_revision_upload_retry_over_http_is_idempotent(client):
+    client.post("/api/score", json={"sample": "tickets_dirty.csv"})
+    data = ("ticket_id,satisfaction,agent\nT-2026-000107,4,王柯\n").encode("utf-8")
+    first = client.post("/api/revisions/upload",
+                        files={"file": ("fix.csv", data, "text/csv")},
+                        data={"dataset": "tickets_dirty.csv"})
+    second = client.post("/api/revisions/upload",
+                         files={"file": ("fix.csv", data, "text/csv")},
+                         data={"dataset": "tickets_dirty.csv"})
+    assert first.status_code == 200 and second.status_code == 200
+    assert first.json()["run"]["run_id"] == second.json()["run"]["run_id"]
+    assert second.json()["replay"] is True
+    assert len(client.get("/api/batches").json()["runs"]) == 2
+
+
+def test_revision_all_unmatched_over_http_keeps_old_run(client):
+    base = client.post("/api/score", json={"sample": "tickets_dirty.csv"}).json()
+    response = client.post("/api/revisions",
+                           json={"dataset": "tickets_dirty.csv",
+                                 "correction_text":
+                                     "ticket_id,satisfaction\nT-0000-000000,3\n"})
+    assert response.status_code == 409
+    assert response.json()["error"] == "R_REVISION_EMPTY"
+    latest = client.get("/api/score/latest").json()["run"]
+    assert latest["run_id"] == base["run"]["run_id"]
+
+
+def test_revision_csv_absent_for_base_run(client_with_run):
+    response = client_with_run.get("/api/export/revision.csv")
+    assert response.status_code == 400

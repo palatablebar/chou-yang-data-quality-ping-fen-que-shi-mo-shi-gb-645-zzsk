@@ -58,6 +58,11 @@ def export_flags(run_id: str | None = None, ctx: Ctx = Depends(get_ctx)):
     return service.export(ctx.store, "flags.csv", run_id)
 
 
+@router.get("/api/export/revision.csv")
+def export_revision(run_id: str | None = None, ctx: Ctx = Depends(get_ctx)):
+    return service.export(ctx.store, "revision.csv", run_id)
+
+
 @router.get("/api/export/manifest.json")
 def export_manifest(run_id: str | None = None, ctx: Ctx = Depends(get_ctx)):
     return service.export(ctx.store, "manifest.json", run_id)

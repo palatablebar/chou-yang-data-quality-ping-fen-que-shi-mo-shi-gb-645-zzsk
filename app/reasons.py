@@ -1,9 +1,10 @@
-"""原因码唯一来源：文件级失败 E_、行级隔离 Q_、标记 K_。
+"""原因码唯一来源：文件级失败 E_、行级隔离 Q_、标记 K_、修订状态 R_。
 
 约定：
 - `E_` 文件级失败：整批不落数据，返回 4xx；
 - `Q_` 行级隔离：结构坏行带原值与行号进隔离区，好行继续；
-- `K_` 单元格/行级标记：不进隔离区，只在证据里留痕。
+- `K_` 单元格/行级标记：不进隔离区，只在证据里留痕；
+- `R_` 修订逐单状态：已更正 / 保持原样 / 待核对，只出现在修订账里。
 """
 from __future__ import annotations
 
@@ -38,6 +39,19 @@ REASONS: dict[str, dict[str, str]] = {
     "K_KEY_CONFLICT": {"label": "同键取值冲突", "level": "warn"},
     "K_CAPPED": {"label": "该维扣分已封顶", "level": "info"},
     "K_REPLAY": {"label": "同输入重跑复用", "level": "info"},
+    "R_CORRECTED": {"label": "已更正", "level": "info"},
+    "R_KEPT_ORIGINAL": {"label": "保持原样", "level": "info"},
+    "R_PENDING": {"label": "待核对", "level": "warn"},
+    "R_CORRECTION_UNMATCHED": {"label": "更正文找不到原始工单", "level": "warn"},
+    "R_CORRECTION_DUPLICATE": {"label": "更正文重复工单", "level": "warn"},
+    "R_DUPLICATE_BASE_ROWS": {"label": "基线纯重复行一并更正", "level": "info"},
+    "R_PENDING_CARRIED": {"label": "沿用上一版未解决的建议值", "level": "info"},
+    "R_CORRECTION_AMBIGUOUS": {"label": "更正文同键多值无法合并", "level": "warn"},
+    "R_CORRECTION_NO_CHANGE": {"label": "更正与原文一致", "level": "info"},
+    "R_CORRECTION_MALFORMED": {"label": "更正文该行列数不一致", "level": "warn"},
+    "R_LINE_SHIFTED": {"label": "行号已变，按业务键重锚", "level": "info"},
+    "R_REVISION_EMPTY": {"label": "修订没有可确认内容", "level": "error"},
+    "R_REVISION_REPLAY": {"label": "同一更正重试复用", "level": "info"},
 }
 
 

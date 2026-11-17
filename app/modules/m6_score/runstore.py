@@ -48,6 +48,7 @@ def _run_row(run: dict) -> dict:
     return {
         "run_id": run["run_id"], "name": run["name"], "digest": run["digest"],
         "rules_version": run["rules_version"], "version": int(run["version"]),
+        "kind": run.get("kind", "base"), "base_run_id": run.get("base_run_id"),
         "score": str(run["score"]), "grade": run["grade"],
         "rows_in": int(run["rows_in"]), "rows_accepted": int(run["rows_accepted"]),
         "rows_unique": int(run["rows_unique"]), "rows_dup": int(run["rows_dup"]),
@@ -59,18 +60,19 @@ def _run_row(run: dict) -> dict:
     }
 
 
-def persist(store, result: dict) -> dict:
+def persist(store, result: dict, *, snapshot: dict | None = None) -> dict:
     run = result["run"]
     store.save_run({
         "run_id": run["run_id"], "name": run["name"], "digest": run["digest"],
         "rules_version": run["rules_version"], "version": run["version"],
+        "kind": run.get("kind", "base"), "base_run_id": run.get("base_run_id"),
         "score": Decimal(run["score"]), "grade": run["grade"],
         "rows_in": run["rows_in"], "rows_accepted": run["rows_accepted"],
         "rows_unique": run["rows_unique"], "rows_dup": run["rows_dup"],
         "rows_quarantine": run["rows_quarantine"], "rows_blank": run["rows_blank"],
         "cells_total": run["cells_total"], "cells_missing": run["cells_missing"],
         "created_at": run["created_at"], "finished_at": run["finished_at"],
-    }, result)
+    }, result, snapshot=snapshot)
     return result
 
 

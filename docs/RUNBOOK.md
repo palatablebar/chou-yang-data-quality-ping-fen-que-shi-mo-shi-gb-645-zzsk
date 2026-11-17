@@ -67,6 +67,37 @@ curl -s http://127.0.0.1:18204/api/export/manifest.json
 | 404 | `E_SAMPLE_UNKNOWN` | 样例名不在白名单，用 `/api/datasets` 看可用项 |
 | 409 | `E_STALE_RUN` | 页面版本落后；刷新后重跑，别用旧页面覆盖 |
 | 404 | `E_RUN_NOT_FOUND` | 还没有运行记录，先跑一次评分 |
+| 409 | `R_REVISION_EMPTY` | 更正文一条都对不上基线（或没有可用数据行）；旧版未动，修正工单号后重传 |
+| 422 | `E_HEADER_INVALID`（修订） | 更正文缺工单号列或没有可改列；见 `detail.source=correction` |
+
+## 5.1 补发修订版
+
+报告发布后客服补回只含部分工单的更正文时，不要重导整份文件（会重算已通过记录），
+而是补发修订版：
+
+```bash
+# 命令行：点名改哪些工单
+curl -s -X POST http://127.0.0.1:18204/api/revisions \
+  -H 'Content-Type: application/json' \
+  -d '{"dataset":"tickets_dirty.csv","correction_text":"ticket_id,agent\nT-2026-000107,王柯\n"}'
+
+# 或上传更正文 CSV
+curl -s -X POST http://127.0.0.1:18204/api/revisions/upload \
+  -F 'file=@fix.csv' -F 'dataset=tickets_dirty.csv' -F 'encoding=utf-8'
+
+# 逐单看已更正 / 待核对 / 保持原样
+curl -s http://127.0.0.1:18204/api/revision | python3 -m json.tool
+curl -s -o /tmp/revision.csv http://127.0.0.1:18204/api/export/revision.csv
+```
+
+要点：
+
+- 更正文只需含 `ticket_id` 与要改的列；空单元格表示「这一列不改」。
+- **未匹配内容不阻断**：能对上的照常发布，找不到 / 重复 / 坏行保留为待核对，
+  并在 `/revisions` 页面与 `revision.csv` 里逐单列出。
+- 同一更正重试不会重复扣分或再加一版；`replay=true`。
+- 第二份更正文默认叠加在上一版之上；要回到更早的基线用 `base_run_id`。
+- 整批失败（如 `R_REVISION_EMPTY` 或写库异常）时旧版保持不变。
 
 ## 6 测试
 

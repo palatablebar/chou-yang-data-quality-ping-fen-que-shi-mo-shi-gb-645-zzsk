@@ -111,3 +111,27 @@ def flags_csv(result: dict) -> str:
     for item in result["dataset"]["flags"]:
         rows.append([item["code"], item["label"], item["level"], item["count"]])
     return csv_text(["原因码", "含义", "级别", "次数"], rows)
+
+
+def revision_csv(result: dict) -> str:
+    """修订账：一行一个工单，状态列直接给出已更正 / 待核对 / 保持原样。
+
+    任何一行都能追到基线行号、更正文行号与原因码；未匹配的行不会被
+    悄悄丢掉，它们就在这份导出里等着人工处理。
+    """
+    revision = result.get("revision") or {}
+    labels = revision.get("status_labels", {})
+    rows = []
+    for ticket in revision.get("tickets", []):
+        rows.append([
+            ticket["ticket_id"],
+            labels.get(ticket["status"], ticket["status"]),
+            ticket["code"],
+            " ".join(str(item) for item in ticket["base_linenos"]),
+            " ".join(str(item) for item in ticket["correction_linenos"]),
+            " ".join(ticket.get("changed_columns") or []),
+            " ".join(ticket.get("warnings") or []),
+            ticket.get("reason", ""),
+        ])
+    return csv_text(["工单", "状态", "原因码", "基线行号", "更正文行号", "改写列",
+                     "附加标记", "说明"], rows)

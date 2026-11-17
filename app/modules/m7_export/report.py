@@ -50,5 +50,7 @@ def build(result: dict) -> dict:
         "stages": result["manifest"]["stages"],
         "thresholds": result["manifest"]["thresholds"],
         "manifest": result["manifest"],
+        "revision": result.get("revision"),
+        "kind": result["run"].get("kind", "base"),
     }
 

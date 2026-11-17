@@ -82,7 +82,12 @@ def page_batches(request: Request, run_id: str | None = None,
                  ctx: Ctx = Depends(get_ctx)):
     run, result = ctx.current_result(run_id)
     runs = ctx.store.list_runs(limit=12)
+    datasets = []
+    for item in ctx.store.list_datasets():
+        datasets.append({"name": item["name"],
+                         "version": ctx.store.latest_version(item["name"])})
     return render(request, "batches.html", page="batches", page_title="评分批次",
                   run=run, result=result, runs=runs,
                   reconcile=result["reconcile"] if result else None,
+                  datasets=datasets,
                   thresholds=runstore.thresholds())

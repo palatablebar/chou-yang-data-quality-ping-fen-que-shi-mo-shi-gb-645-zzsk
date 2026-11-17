@@ -17,6 +17,8 @@ EXPORTS = {
     "quarantine.csv": ("quarantine.csv", "text/csv; charset=utf-8",
                        csv_out.quarantine_csv),
     "flags.csv": ("flags.csv", "text/csv; charset=utf-8", csv_out.flags_csv),
+    "revision.csv": ("revision.csv", "text/csv; charset=utf-8",
+                     csv_out.revision_csv),
 }
 
 
@@ -31,6 +33,8 @@ def export(store, kind: str, run_id: str | None = None) -> Response:
     if kind not in EXPORTS and kind != "manifest.json":
         raise BadRequest(f"未知导出：{kind}")
     run, result = _load(store, run_id)
+    if kind == "revision.csv" and not result.get("revision"):
+        raise BadRequest(f"当前运行不是修订版：{run['run_id']}", code="E_BAD_REQUEST")
     if kind == "manifest.json":
         payload = manifest_out.build(result)
         return Response(content=manifest_out.to_json(payload),

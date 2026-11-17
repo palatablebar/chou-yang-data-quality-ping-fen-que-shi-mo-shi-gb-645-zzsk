@@ -24,8 +24,6 @@ def run(settings: config.Settings, store, *, name: str | None = None,
         expected_version: int | None = None) -> dict:
     started_at = dt.datetime.now(config.UTC).isoformat(timespec="seconds")
     clock = time.perf_counter()
-    stages: list[dict] = []
-    counters: dict = {}
 
     ingest = m1_service.ingest(settings, name=name, data=data,
                                declared=declared, store=store)
@@ -38,7 +36,23 @@ def run(settings: config.Settings, store, *, name: str | None = None,
                           data=ingest["raw"], stamp=started_at)
         return runstore.replay(store, existing)
 
-    steps = [("ingest", lambda: None)]
+    version = store.latest_version(ingest["name"]) + 1
+    result = build_result(settings, ingest, started_at=started_at, clock=clock,
+                          version=version, kind="base", base_run_id=None)
+    store.save_dataset(name=ingest["name"], digest=ingest["digest"],
+                      encoding=ingest["encoding"],
+                      declared_encoding=ingest["declared_encoding"],
+                      data=ingest["raw"], stamp=started_at)
+    # 原文与采信快照一起落：后续修订只读这份基线，不重导当前数据集
+    runstore.persist(store, result, snapshot=m1_service.snapshot(ingest))
+    return result
+
+
+def build_result(settings: config.Settings, ingest: dict, *, started_at: str,
+                 clock: float, version: int, kind: str,
+                 base_run_id: str | None) -> dict:
+    """采信结果 → 七阶段结果。基础运行与修订共用，保证同一套规则同一套账。"""
+    stages: list[dict] = []
     stages.append(_stage("ingest", ingest["counts"]["raw_records"],
                          ingest["counts"]["accepted"],
                          ingest["counts"]["quarantine"], clock))
@@ -97,7 +111,6 @@ def run(settings: config.Settings, store, *, name: str | None = None,
         "tested_cells": counts["tested_cells"],
         "segments": ingest["segments"],
     }
-    version = store.latest_version(ingest["name"]) + 1
     run_id = manifest.new_run_id()
     finished_at = dt.datetime.now(config.UTC).isoformat(timespec="seconds")
     payload = manifest.build(
@@ -115,6 +128,7 @@ def run(settings: config.Settings, store, *, name: str | None = None,
         "run": {
             "run_id": run_id, "name": ingest["name"], "digest": ingest["digest"],
             "rules_version": settings.rule_version, "version": version,
+            "kind": kind, "base_run_id": base_run_id,
             "score": scored["score"], "grade": scored["grade"],
             "rows_in": ingest["counts"]["raw_records"],
             "rows_accepted": ingest["counts"]["accepted"],
@@ -148,14 +162,9 @@ def run(settings: config.Settings, store, *, name: str | None = None,
         "reconcile": reconcile,
         "manifest": payload,
         "replay": False,
+        "revision": None,
     }
-    result = _json_safe(result)
-    store.save_dataset(name=ingest["name"], digest=ingest["digest"],
-                      encoding=ingest["encoding"],
-                      declared_encoding=ingest["declared_encoding"],
-                      data=ingest["raw"], stamp=started_at)
-    runstore.persist(store, result)
-    return result
+    return _json_safe(result)
 
 
 def _stage(key: str, in_count: int, out_count: int, quarantine_count: int,

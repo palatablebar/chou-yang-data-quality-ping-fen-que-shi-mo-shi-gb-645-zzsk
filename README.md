@@ -18,7 +18,8 @@
 | 重复判定 | 全行哈希账与业务键账分开；同键不同值的两行都保留原值并列出冲突列 |
 | 稳健离群 | 中位数 + MAD 稳健 z，MAD=0 回退 IQR/1.349，离散度低于刻度下限判退化 |
 | 评分 | 100 − 缺失 30 − 重复 25 − 离群 20 − 格式 25，每维按容忍度封顶，Decimal 计分 |
-| 批次与导出 | run_id、输入 sha256、版本自增、同输入幂等复用、陈旧提交 409、六种 CSV + 清单 JSON |
+| 批次与导出 | run_id、输入 sha256、版本自增、同输入幂等复用、陈旧提交 409、六种 CSV + 修订账 + 清单 JSON |
+| 修订补发 | 只含部分工单的更正文按业务键回锚，逐单三分状态；未匹配不阻断、待核对结转、同一更正重试幂等 |
 
 ## 功能模块
 
@@ -31,6 +32,7 @@
 | M5 稳健离群 | `GET /api/outliers`、页面 `/outliers` | `app/modules/m5_outliers/robust.py`、`zscore.py`、`flags.py` | `tests/test_m5_outliers.py` |
 | M6 评分与批次 | `POST /api/score`、`GET /api/batches`、`GET /api/reconcile`、页面 `/batches` | `app/modules/m6_score/score.py`、`grade.py`、`runstore.py`、`service.py` | `tests/test_m6_score.py` |
 | M7 报告导出 | `GET /`、`GET /api/export/*` | `app/modules/m7_export/report.py`、`csv_out.py`、`manifest_out.py` | `tests/test_m7_export.py` |
+| M8 修订补发 | `POST /api/revisions`、`POST /api/revisions/upload`、`GET /api/revision`、页面 `/revisions` | `app/modules/m8_revision/correction.py`、`matcher.py`、`service.py` | `tests/test_m8_revision.py` |
 
 ## 核心规则
 
@@ -63,7 +65,9 @@ open http://127.0.0.1:18204/
 3. `/duplicates` 看全行重复组与 `T-2026-000204` 的冲突列。
 4. `/outliers` 看 `first_response_min` 的极端值与 `satisfaction` 的退化标记。
 5. `/batches` 看版本、阈值与五项对账；再点「重跑」验证幂等复用。
-6. 任一页面底部导出 CSV，或直接 `curl /api/export/manifest.json` 取运行清单。
+6. `/batches` 或 `/revisions` 上传只含部分工单的更正文（至少含工单号列），
+   看逐单「已更正 / 待核对 / 保持原样」；未匹配的行不阻断发布，留在修订账里。
+7. 任一页面底部导出 CSV，或直接 `curl /api/export/manifest.json` 取运行清单。
 
 ## API 与页面
 
@@ -82,20 +86,23 @@ open http://127.0.0.1:18204/
 | POST | `/api/score` | 跑一次评分（可带 `expected_version`） |
 | GET | `/api/batches` | 运行历史 |
 | GET | `/api/reconcile` | 五项对账 |
-| GET | `/api/export/report.csv` 等 | 六种 CSV + `manifest.json` |
-| GET | `/`、`/profile`、`/missing`、`/duplicates`、`/outliers`、`/batches` | 六个页面 |
+| POST | `/api/revisions` | 补发修订（`{"dataset","correction_text"}`） |
+| POST | `/api/revisions/upload` | 上传更正文 CSV（multipart，`file` + `dataset`） |
+| GET | `/api/revision` | 当前（或指定）运行的修订账 |
+| GET | `/api/export/report.csv` 等 | 六种 CSV + 修订账 + `manifest.json` |
+| GET | `/`、`/profile`、`/missing`、`/duplicates`、`/outliers`、`/batches`、`/revisions` | 七个页面 |
 
 ## 目录
 
 ```text
 app/
   main.py config.py errors.py reasons.py manifest.py store.py web.py
-  modules/m1_ingest … m7_export/   每个模块 handler + service + 3 个规则/读写文件
-  templates/  base.html + 6 页
+  modules/m1_ingest … m8_revision/   每个模块 handler + service + 3 个规则/读写文件
+  templates/  base.html + 7 页
   static/     theme.css layout.css components.css app.js table.js charts.js
 docs/         DEPTH.md DATA-DICTIONARY.md RUNBOOK.md
 sample_data/  9 个 CSV（脏、干净、GB18030、BOM、截断、常量列、仅表头、空行、空文件）
-tests/        conftest.py + 7 个模块测试 + e2e + invariants + fixtures
+tests/        conftest.py + 8 个模块测试 + e2e + invariants + fixtures
 ```
 
 ## 定义与已覆盖
@@ -105,3 +112,5 @@ tests/        conftest.py + 7 个模块测试 + e2e + invariants + fixtures
 
 不覆盖：多表关联、增量追加（每次按整份文件算）、图表之外的统计检验、
 自定义权重（权重与容忍度写在配置里，改完需重新运行）。
+修订补发只按业务键合并部分工单，不重导整份文件；未匹配项保留待核对，
+不阻断已匹配部分的发布。

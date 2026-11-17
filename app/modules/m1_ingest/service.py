@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import base64
 import datetime as dt
 from pathlib import Path
 
@@ -95,6 +96,31 @@ def ingest(settings: config.Settings, *, name: str | None = None,
         "raw": data,
         "renamed": rename,
     }
+
+
+def snapshot(ingest: dict) -> dict:
+    """采信快照：原文 + 解析结果，供修订无重导复用。
+
+    只存 JSON 安全内容（原文字节转 base64），基线运行一旦落库就不可变；
+    修订按这份快照重算下游，所以「已通过的记录」不会被整批重导改写。
+    """
+    return {
+        "raw": base64.b64encode(ingest["raw"]).decode("ascii"),
+        "declared": ingest["declared_encoding"] or "",
+        "encoding": ingest["encoding"],
+        "delimiter": ingest["delimiter"],
+        "segments": ingest["segments"],
+        "header": ingest["header"],
+        "rows": ingest["rows"],
+        "quarantine": ingest["quarantine"],
+        "flags": ingest["flags"],
+        "counts": ingest["counts"],
+    }
+
+
+def unpack_raw(snapshot: dict) -> bytes:
+    return base64.b64decode(snapshot["raw"].encode("ascii")) if snapshot.get("raw") \
+        else b""
 
 
 def quarantine_summary(quarantine: list[dict]) -> list[dict]:

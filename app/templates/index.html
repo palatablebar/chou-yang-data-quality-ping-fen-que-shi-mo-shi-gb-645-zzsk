@@ -10,9 +10,29 @@
   <div class="verdict__side">
     <span class="grade grade--{{ report.grade|lower }}">{{ report.grade }} · {{ report.grade_label }}</span>
     <span class="verdict__dataset">{{ report.dataset.name }}</span>
+    {% if report.revision %}
+    <span class="verdict__digest">修订版 v{{ report.run.version }} · 基线 v{{ report.revision.base_version }} · 得分 {{ report.revision.score_effect.base_score }} → {{ report.revision.score_effect.revision_score }}</span>
+    {% endif %}
     <span class="verdict__digest">sha256 <code>{{ report.dataset.digest[:16] }}</code></span>
   </div>
 </section>
+
+{% if report.revision %}
+<section class="block">
+  <h2 class="block__title">修订账<span class="block__hint">{{ report.revision.policy }}</span></h2>
+  <p class="statline">
+    <span>已更正 <b class="ok num">{{ report.revision.counts.corrected }}</b></span>
+    <span>待核对 <b class="bad num">{{ report.revision.counts.pending }}</b></span>
+    <span>保持原样 <b class="num">{{ report.revision.counts.kept_original }}</b></span>
+    <span>改写格 <b class="num">{{ report.revision.counts.changed_cells }}</b></span>
+    <span>更正文行 <b class="num">{{ report.revision.counts.correction_rows }}</b></span>
+  </p>
+  <p class="links">
+    <a class="link" href="/revisions?run_id={{ report.run.run_id }}">逐单状态</a>
+    <a class="link" href="/api/export/revision.csv">修订账 CSV</a>
+  </p>
+</section>
+{% endif %}
 
 <section class="block">
   <h2 class="block__title">扣分<span class="block__hint num">{{ report.penalty_sum }} / 100</span></h2>
@@ -156,6 +176,7 @@
     <a class="link" href="/api/export/report.csv">报告 CSV</a>
     <a class="link" href="/api/export/profile.csv">画像 CSV</a>
     <a class="link" href="/api/export/quarantine.csv">隔离区 CSV</a>
+    {% if report and report.revision %}<a class="link" href="/api/export/revision.csv">修订账 CSV</a>{% endif %}
     <a class="link" href="/api/export/manifest.json">运行清单 JSON</a>
   </p>
 </section>
